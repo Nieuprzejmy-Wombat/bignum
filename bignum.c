@@ -20,17 +20,12 @@ int toInt(u_char *c);
 bignum *get_bignum();
 bignum *new_bignum();
 char toHex(u_char c);
-// bignum *mul(bignum *a, bignum *b);
+bignum *mul(bignum *a, bignum *b);
 void mul_single_digit(bignum *a, u_char b);
 
 int main() {
   // pprint(get_bignum());
-  bignum *a = get_bignum();
-  pprint(a);
-  u_char b;
-  scanf("%hhu", &b);
-  mul_single_digit(a, b);
-  pprint(a);
+  mul(get_bignum(), get_bignum());
   return 0;
 }
 
@@ -78,7 +73,24 @@ int toInt(u_char *c) {
 }
 char toHex(u_char c) { return c < 10 ? c + '0' : c - 10 + 65; }
 
-bignum *mul(bignum *a, bignum *b) { return a; }
+bignum *mul(bignum *a, bignum *b) {
+  bignum *bignums[b->length]; // intermediate results which will be summed later
+  for (int i = 0; i < b->length; i++) {
+    bignum *ptr;
+    memcpy(ptr, a, sizeof(bignum) + a->length * sizeof(u_char));
+    bignums[i] = ptr;
+    if (i > 0) {
+      bignums[i] = realloc(bignums[i],
+                           sizeof(bignum) + (a->length + i) * sizeof(u_char));
+      for (int j = 0; j < i; j++)
+        bignums[i]->segments[bignums[i]->length + j] = 0;
+      bignums[i]->length += i;
+    }
+    mul_single_digit(bignums[i], b->segments[b->length - 1 - i]);
+    pprint(bignums[i]);
+  }
+  return a;
+}
 
 void mul_single_digit(bignum *a, u_char b) {
   int overflow = 0;
