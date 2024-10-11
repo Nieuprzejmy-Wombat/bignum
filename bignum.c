@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/types.h>
 #define MAX_U_CHAR ((u_char)(pow(2, sizeof(u_char) * 8) - 1))
+// %hhu - unsigned char format specifier
 
 typedef struct bignum {
   bool sign;
@@ -20,12 +21,14 @@ bignum *get_bignum();
 bignum *new_bignum();
 char toHex(u_char c);
 // bignum *mul(bignum *a, bignum *b);
-
 void mul_single_digit(bignum *a, u_char b);
+
 int main() {
+  // pprint(get_bignum());
   bignum *a = get_bignum();
-  int b;
-  scanf("%d", &b);
+  pprint(a);
+  u_char b;
+  scanf("%hhu", &b);
   mul_single_digit(a, b);
   pprint(a);
   return 0;
@@ -33,8 +36,7 @@ int main() {
 
 bignum *new_bignum() {
   bignum *res = malloc(sizeof(bignum));
-  res->length = 0;
-  res->sign = true;
+  *res = (bignum){.length = 0, .sign = true};
   return res;
 }
 
@@ -75,38 +77,25 @@ int toInt(u_char *c) {
     return -1; // error
 }
 char toHex(u_char c) { return c < 10 ? c + '0' : c - 10 + 65; }
-/*
-bignum *mul(bignum *a, bignum *b) {
-  bignum *res =
-      malloc(sizeof(bignum) + sizeof(u_char) * (a->length + b->length));
-  res->length = a->length + b->length;
-  res->sign = a->sign ^ b->sign;
 
-  for (int i = b->length - 1; i >= 0; i--) {
-    for (int j = a->length - 1; j >= 0; j--) {
-    }
-  }
-}
-*/
+bignum *mul(bignum *a, bignum *b) { return a; }
+
 void mul_single_digit(bignum *a, u_char b) {
   int overflow = 0;
   for (int i = a->length - 1; i >= 0; i--) {
     int res = (int)a->segments[i] * (int)b + overflow;
     if (res > MAX_U_CHAR) {
-      a->segments[i] = res % MAX_U_CHAR;
-      overflow = res - a->segments[i];
-      if (i == 0 && overflow > 0) {
-        int new_segments = overflow / MAX_U_CHAR;
-        a = realloc(a, sizeof(bignum) +
-                           sizeof(u_char) * (a->length + new_segments));
-        memcpy(a->segments + sizeof(u_char) * new_segments, a->segments,
-               a->length * sizeof(u_char));
-        a->length += new_segments;
-        for (int j = new_segments; j >= 0; j--)
-          a->segments[j] = MAX_U_CHAR;
-      }
+      a->segments[i] = res % (MAX_U_CHAR + 1);
+      overflow = (res - a->segments[i]) / (MAX_U_CHAR + 1);
     } else
       a->segments[i] = res;
+  }
+  if (overflow > 0) {
+    // move the array 1 index to the right to make room for overflow
+    a = realloc(a, sizeof(bignum) + sizeof(u_char) * ++a->length);
+    memcpy(a->segments + sizeof(u_char), a->segments,
+           (a->length - 1) * sizeof(u_char));
+    a->segments[0] = overflow;
   }
   return;
 }
