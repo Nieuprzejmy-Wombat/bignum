@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,27 +12,61 @@
 typedef struct bignum {
   bool sign;
   u_long length;
-  u_char segments[];
+  u_char *segments;
 } bignum;
 
-u_char *last(bignum *num);
 void pprint(bignum *num);
-int toInt(u_char *c);
+int toInt(const u_char *c);
 bignum *get_bignum();
 bignum *new_bignum();
 char toHex(u_char c);
 bignum *mul(bignum *a, bignum *b);
 void mul_single_digit(bignum *a, u_char b);
+size_t size(bignum *num);
+void add_pos(bignum *a, bignum *b);
+bignum *shift(bignum *num, u_long n);
+bignum *copy(bignum *num);
+void free_bignum(bignum *num);
 
 int main() {
-  // pprint(get_bignum());
-  mul(get_bignum(), get_bignum());
+  bignum *a = get_bignum();
+  bignum *b = get_bignum();
+  bignum *res = mul(a, b);
+  pprint(res);
+  free_bignum(res);
+  free_bignum(a);
+  free_bignum(b);
   return 0;
 }
 
+size_t size(bignum *num) { return sizeof(bignum) + num->length; }
+
 bignum *new_bignum() {
   bignum *res = malloc(sizeof(bignum));
-  *res = (bignum){.length = 0, .sign = true};
+  *res = (bignum){.length = 0, .sign = true, .segments = NULL};
+  return res;
+}
+
+void free_bignum(bignum *num) {
+  free(num->segments);
+  free(num);
+}
+
+bignum *copy(bignum *num) {
+  bignum *res = new_bignum();
+  *res = (bignum){.length = num->length,
+                  .sign = num->sign,
+                  .segments =
+                      memcpy(malloc(num->length), num->segments, num->length)};
+  return res;
+}
+
+void *safe_realloc(void *ptr, size_t size) {
+  void *res = realloc(ptr, size);
+  if (res == NULL) {
+    printf("realloc() failed");
+    exit(1);
+  }
   return res;
 }
 
@@ -45,7 +80,7 @@ bignum *get_bignum() {
   }
   u_char d = getchar();
   do {
-    res = realloc(res, sizeof(bignum) + sizeof(u_char) * ++res->length);
+    res->segments = safe_realloc(res->segments, ++res->length);
     res->segments[res->length - 1] =
         toInt(&d) == -1 ? toInt(&c) : toInt(&c) * 16 + toInt(&d);
   } while ((c = getchar()) != '\n' && (d = getchar()) != '\n');
@@ -61,55 +96,73 @@ void pprint(bignum *num) {
   printf("\n");
 }
 
-int toInt(u_char *c) {
+int toInt(const u_char *c) {
   if (isdigit(*c))
     return *c - '0';
-  else if (*c >= 97 && *c <= 102)
-    return *c - 97 + 10; // lowercase hex
-  else if (*c >= 65 && *c <= 70)
-    return *c - 65 + 10; // uppercase hex
-  else
-    return -1; // error
+  if (*c >= 'a' && *c <= 'f')
+    return *c - 'a' + 10;
+  if (*c >= 'A' && *c <= 'F')
+    return *c - 'A' + 10;
+  return -1;
 }
-char toHex(u_char c) { return c < 10 ? c + '0' : c - 10 + 65; }
+
+char toHex(u_char c) { return c < 10 ? c + '0' : c - 10 + 'A'; }
 
 bignum *mul(bignum *a, bignum *b) {
   bignum *bignums[b->length]; // intermediate results which will be summed later
   for (int i = 0; i < b->length; i++) {
-    bignum *ptr;
-    memcpy(ptr, a, sizeof(bignum) + a->length * sizeof(u_char));
-    bignums[i] = ptr;
+    bignums[i] = copy(a);
+    mul_single_digit(bignums[i], b->segments[b->length - 1 - i]);
     if (i > 0) {
-      bignums[i] = realloc(bignums[i],
-                           sizeof(bignum) + (a->length + i) * sizeof(u_char));
-      for (int j = 0; j < i; j++)
-        bignums[i]->segments[bignums[i]->length + j] = 0;
+      // add trailing zeroes
+      bignums[i]->segments =
+          realloc(bignums[i]->segments, bignums[i]->length + i);
+      memset(bignums[i]->segments + bignums[i]->length, 0, i);
       bignums[i]->length += i;
     }
-    mul_single_digit(bignums[i], b->segments[b->length - 1 - i]);
-    pprint(bignums[i]);
   }
-  return a;
+  for (u_long i = 1; i < b->length; i++) {
+    add_pos(bignums[0], bignums[i]);
+    free_bignum(bignums[i]);
+  }
+  return bignums[0];
 }
 
 void mul_single_digit(bignum *a, u_char b) {
   int overflow = 0;
   for (int i = a->length - 1; i >= 0; i--) {
     int res = (int)a->segments[i] * (int)b + overflow;
-    if (res > MAX_U_CHAR) {
-      a->segments[i] = res % (MAX_U_CHAR + 1);
-      overflow = (res - a->segments[i]) / (MAX_U_CHAR + 1);
-    } else
-      a->segments[i] = res;
+    a->segments[i] = res % (MAX_U_CHAR + 1);
+    overflow = res / (MAX_U_CHAR + 1);
   }
   if (overflow > 0) {
-    // move the array 1 index to the right to make room for overflow
-    a = realloc(a, sizeof(bignum) + sizeof(u_char) * ++a->length);
-    memcpy(a->segments + sizeof(u_char), a->segments,
-           (a->length - 1) * sizeof(u_char));
+    a = shift(a, 1);
     a->segments[0] = overflow;
   }
-  return;
 }
 
-u_char *last(bignum *num) { return &num->segments[num->length - 1]; }
+void add_pos(bignum *a, bignum *b) {
+  long diff = a->length - b->length;
+  bignum *shorter = diff < 0 ? a : b;
+  diff = labs(diff);
+  shorter = shift(shorter, diff);
+  memset(shorter->segments, 0, diff);
+  int overflow = 0;
+  for (int i = a->length - 1; i >= 0; i--) {
+    int res = (int)a->segments[i] + (int)b->segments[i] + overflow;
+    a->segments[i] = res % (MAX_U_CHAR + 1);
+    overflow = res / (MAX_U_CHAR + 1);
+  }
+  if (overflow > 0) {
+    a = shift(a, 1);
+    a->segments[0] = overflow;
+  }
+}
+
+bignum *shift(bignum *num, u_long n) {
+  num->segments = safe_realloc(num->segments, num->length + n);
+  for (int i = num->length - 1 + n; i > 0; i--)
+    num->segments[i] = num->segments[i - n];
+  num->length += n;
+  return num;
+}
