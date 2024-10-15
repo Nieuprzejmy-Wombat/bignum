@@ -70,7 +70,7 @@ void *safe_realloc(void *ptr, size_t size) {
   return res;
 }
 
-// currently least significant at the end
+//  currently least significant at the end
 bignum *get_bignum() {
   bignum *res = new_bignum();
   u_char c = getchar();
@@ -125,6 +125,7 @@ bignum *mul(bignum *a, bignum *b) {
     add_pos(bignums[0], bignums[i]);
     free_bignum(bignums[i]);
   }
+  bignums[0]->sign = a->sign == b->sign;
   return bignums[0];
 }
 
