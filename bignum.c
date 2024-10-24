@@ -80,43 +80,24 @@ bignum *get_bignum() {
     res->sign = false;
     c = getchar();
   }
-  int i = 1;
-  u_char *cs = malloc(i);
+  int length = 1;
+  u_char *cs = malloc(length);
   do {
-    cs[i - 1] = c;
-    cs = safe_realloc(cs, ++i);
+    cs[length - 1] = c;
+    cs = safe_realloc(cs, ++length);
   } while (!isspace(c = getchar()));
-  for (int j = 1; j < i; j += 2) {
+  int i = 1;
+  if (length % 2 == 0) {
+    i++;
     res->segments = safe_realloc(res->segments, ++res->length);
-    res->segments[res->length - 1] = toInt(cs[j - 1]) * 16 + toInt(cs[j]);
+    res->segments[0] = toInt(cs[0]);
   }
-  if (i % 2 == 0) {
-    printf("uneven");
+  for (; i + 1 < length; i += 2) {
+    res->segments = safe_realloc(res->segments, ++res->length);
+    res->segments[res->length - 1] = toInt(cs[i - 1]) * 16 + toInt(cs[i]);
   }
+  free(cs);
   return res;
-  /*  if (isspace(c)) {
-      printf("fatal: empty bignum\n");
-      exit(1);
-    }
-    u_char d = getchar();
-    if (isspace(d)) {
-      res->segments = safe_realloc(res->segments, ++res->length);
-      res->segments[0] = toInt(c);
-      return res;
-    }
-    while (1) {
-      res->segments = safe_realloc(res->segments, ++res->length);
-      res->segments[res->length - 1] =
-          toInt(d) == -1 ? toInt(c) : toInt(c) * 16 + toInt(d);
-      if (isspace(c = getchar()))
-        return res;
-      if (isspace(d = getchar())) {
-        res->segments = safe_realloc(res->segments, ++res->length);
-        res->segments[res->length - 1] = toInt(c);
-        return res;
-      }
-    }
-    return res;*/
 }
 
 void pprint(bignum *num) {
