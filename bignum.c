@@ -1,38 +1,16 @@
+#include "bignum.h"
 #include <ctype.h>
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#define MAX_U_CHAR ((u_char)(pow(2, sizeof(u_char) * 8) - 1))
-// %hhu - unsigned char format specifier
-
-typedef struct bignum {
-  bool sign;
-  u_long length;
-  u_char *segments;
-} bignum;
-
-void pprint(bignum *num);
-int toInt(u_char c);
-bignum *get_bignum();
-bignum *new_bignum();
-char toHex(u_char c);
-bignum *mul(bignum *a, bignum *b);
-void mul_single_digit(bignum *a, u_char b);
-size_t size(bignum *num);
-void add_pos(bignum *a, bignum *b);
-bignum *shift(bignum *num, u_long n);
-bignum *copy(bignum *num);
-void free_bignum(bignum *num);
+#define BASE 256
 
 int main() {
-  bignum *a = get_bignum();
-  pprint(a);
-  bignum *b = get_bignum();
-  pprint(b);
+  bignum *a = get_bignum(' ');
+  bignum *b = get_bignum('\n');
   bignum *res = mul(a, b);
   pprint(res);
   free_bignum(res);
@@ -65,15 +43,14 @@ bignum *copy(bignum *num) {
 
 void *safe_realloc(void *ptr, size_t size) {
   void *res = realloc(ptr, size);
-  if (res == NULL) {
+  if (!res) {
     printf("realloc() failed");
     exit(1);
   }
   return res;
 }
 
-//  currently least significant at the end
-bignum *get_bignum() {
+bignum *get_bignum(char end) {
   bignum *res = new_bignum();
   u_char c = getchar();
   if (c == '-') {
@@ -83,9 +60,13 @@ bignum *get_bignum() {
   int length = 1;
   u_char *cs = malloc(length);
   do {
+    if (!isxdigit(c)) {
+      printf("didn't expect character: %c\n", c);
+      exit(1);
+    }
     cs[length - 1] = c;
     cs = safe_realloc(cs, ++length);
-  } while (!isspace(c = getchar()));
+  } while ((c = getchar()) != end);
   int i = 1;
   if (length % 2 == 0) {
     i++;
@@ -123,7 +104,7 @@ char toHex(u_char c) { return c < 10 ? c + '0' : c - 10 + 'A'; }
 
 bignum *mul(bignum *a, bignum *b) {
   bignum *bignums[b->length]; // intermediate results which will be summed later
-  for (int i = 0; i < b->length; i++) {
+  for (u_long i = 0; i < b->length; i++) {
     bignums[i] = copy(a);
     mul_single_digit(bignums[i], b->segments[b->length - 1 - i]);
     if (i > 0) {
@@ -146,8 +127,8 @@ void mul_single_digit(bignum *a, u_char b) {
   int overflow = 0;
   for (int i = a->length - 1; i >= 0; i--) {
     int res = (int)a->segments[i] * (int)b + overflow;
-    a->segments[i] = res % (MAX_U_CHAR + 1);
-    overflow = res / (MAX_U_CHAR + 1);
+    a->segments[i] = res % BASE;
+    overflow = res / BASE;
   }
   if (overflow > 0) {
     a = shift(a, 1);
@@ -164,8 +145,8 @@ void add_pos(bignum *a, bignum *b) {
   int overflow = 0;
   for (int i = a->length - 1; i >= 0; i--) {
     int res = (int)a->segments[i] + (int)b->segments[i] + overflow;
-    a->segments[i] = res % (MAX_U_CHAR + 1);
-    overflow = res / (MAX_U_CHAR + 1);
+    a->segments[i] = res % BASE;
+    overflow = res / BASE;
   }
   if (overflow > 0) {
     a = shift(a, 1);
