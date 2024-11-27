@@ -10,7 +10,13 @@
 
 int main() {
   bignum *a = get_bignum(' ');
+  if (!a)
+    exit(1);
   bignum *b = get_bignum('\n');
+  if (!b) {
+    free_bignum(a);
+    exit(1);
+  }
   bignum *res = mul(a, b);
   pprint(res);
   free_bignum(res);
@@ -62,7 +68,9 @@ bignum *get_bignum(char end) {
   do {
     if (!isxdigit(c)) {
       printf("didn't expect character: %c\n", c);
-      exit(1);
+      free(cs);
+      free_bignum(res);
+      return NULL;
     }
     cs[length - 1] = c;
     cs = safe_realloc(cs, ++length);
