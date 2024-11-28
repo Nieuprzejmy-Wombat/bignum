@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-typedef bool predicate(char c);
-
 typedef struct bignum {
   bool sign;
   u_long length;
